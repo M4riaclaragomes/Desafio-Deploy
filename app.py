@@ -1,21 +1,18 @@
 import os
 from flask import Flask, request, jsonify
-import psycopg2 # Importa o driver PostgreSQL
+import psycopg2
 from datetime import datetime
 
 app = Flask(__name__)
 
 # --- Configurações do Banco de Dados ---
-# Pega as credenciais do banco de dados de variáveis de ambiente
-# Isso é crucial para segurança e flexibilidade em ambientes de deploy
 DB_NAME = os.environ.get('DB_NAME')
 DB_USER = os.environ.get('DB_USER')
 DB_PASSWORD = os.environ.get('DB_PASSWORD')
 DB_HOST = os.environ.get('DB_HOST')
-DB_PORT = os.environ.get('DB_PORT', '5432') # Porta padrão do PostgreSQL
+DB_PORT = os.environ.get('DB_PORT', '5432')
 
 def get_db_connection():
-    """Função para estabelecer uma conexão com o banco de dados PostgreSQL."""
     try:
         conn = psycopg2.connect(
             dbname=DB_NAME,
@@ -27,17 +24,16 @@ def get_db_connection():
         return conn
     except Exception as e:
         print(f"Erro ao conectar ao banco de dados: {e}")
-        raise # Levanta a exceção para que o erro seja tratado
+        raise # Mantemos o raise para que o erro seja visível no log do Render
 
 def init_db():
-    """Inicializa o esquema do banco de dados, criando a tabela 'tasks' se ela não existir."""
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('''
             CREATE TABLE IF NOT EXISTS tasks (
-                id SERIAL PRIMARY KEY, -- 'SERIAL' é o equivalente a AUTOINCREMENT no PostgreSQL
+                id SERIAL PRIMARY KEY,
                 title TEXT NOT NULL,
                 description TEXT,
                 status TEXT NOT NULL,
@@ -49,14 +45,20 @@ def init_db():
         print("Banco de dados inicializado com sucesso!")
     except Exception as e:
         print(f"Erro ao inicializar o banco de dados: {e}")
-        # Em uma aplicação real, você pode querer registrar este erro e sair
     finally:
         if conn:
             conn.close()
 
-# --- Funções de Validação ---
+# --- NOVA ROTA DE TESTE ---
+@app.route('/', methods=['GET'])
+def home():
+    """Rota de teste para verificar se a aplicação está no ar."""
+    return "Bem-vindo à API de Tarefas!", 200
+# --- FIM DA NOVA ROTA DE TESTE ---
+
+
+# --- Funções de Validação (sem alterações) ---
 def validate_date(date_str):
-    """Valida se uma string de data está no formato YYYY-MM-DD."""
     if not date_str:
         return True
     try:
@@ -66,14 +68,12 @@ def validate_date(date_str):
         return False
 
 def validate_status(status):
-    """Valida se o status fornecido é um dos valores permitidos."""
     return status in ['pendente', 'realizando', 'concluída']
 
-# --- Rotas da API ---
+# --- Rotas da API (sem alterações, exceto os print para depuração) ---
 
 @app.route('/tarefas', methods=['POST'])
 def create_task():
-    """Cria uma nova tarefa no banco de dados."""
     data = request.get_json()
     title = data.get('titulo')
     description = data.get('descricao')
@@ -93,12 +93,11 @@ def create_task():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        # %s é o placeholder para psycopg2, e RETURNING id retorna o ID gerado
         cursor.execute('''
             INSERT INTO tasks (title, description, status, due_date)
             VALUES (%s, %s, %s, %s) RETURNING id;
         ''', (title, description, status, due_date))
-        task_id = cursor.fetchone()[0] # Pega o ID retornado
+        task_id = cursor.fetchone()[0]
         conn.commit()
         cursor.close()
         return jsonify({
@@ -109,7 +108,7 @@ def create_task():
             'data_vencimento': due_date
         }), 201
     except Exception as e:
-        print(f"Erro ao criar tarefa: {e}") # Para depuração
+        print(f"Erro ao criar tarefa: {e}")
         return jsonify({'error': 'Erro interno no servidor'}), 500
     finally:
         if conn:
@@ -117,7 +116,6 @@ def create_task():
 
 @app.route('/tarefas', methods=['GET'])
 def list_tasks():
-    """Lista todas as tarefas, opcionalmente filtradas por status."""
     status = request.args.get('status')
     conn = None
     try:
@@ -138,7 +136,7 @@ def list_tasks():
         cursor.close()
         return jsonify(tasks), 200
     except Exception as e:
-        print(f"Erro ao listar tarefas: {e}") # Para depuração
+        print(f"Erro ao listar tarefas: {e}")
         return jsonify({'error': 'Erro interno no servidor'}), 500
     finally:
         if conn:
@@ -146,7 +144,6 @@ def list_tasks():
 
 @app.route('/tarefas/<int:id>', methods=['GET'])
 def get_task(id):
-    """Obtém uma tarefa específica pelo ID."""
     conn = None
     try:
         conn = get_db_connection()
@@ -165,7 +162,7 @@ def get_task(id):
             'data_vencimento': task[4]
         }), 200
     except Exception as e:
-        print(f"Erro ao obter tarefa: {e}") # Para depuração
+        print(f"Erro ao obter tarefa: {e}")
         return jsonify({'error': 'Erro interno no servidor'}), 500
     finally:
         if conn:
@@ -173,7 +170,6 @@ def get_task(id):
 
 @app.route('/tarefas/<int:id>', methods=['PUT'])
 def update_task(id):
-    """Atualiza uma tarefa existente pelo ID."""
     data = request.get_json()
     title = data.get('titulo')
     description = data.get('descricao')
@@ -213,7 +209,7 @@ def update_task(id):
             'data_vencimento': due_date
         }), 200
     except Exception as e:
-        print(f"Erro ao atualizar tarefa: {e}") # Para depuração
+        print(f"Erro ao atualizar tarefa: {e}")
         return jsonify({'error': 'Erro interno no servidor'}), 500
     finally:
         if conn:
@@ -221,7 +217,6 @@ def update_task(id):
 
 @app.route('/tarefas/<int:id>', methods=['DELETE'])
 def delete_task(id):
-    """Exclui uma tarefa existente pelo ID."""
     conn = None
     try:
         conn = get_db_connection()
@@ -236,16 +231,12 @@ def delete_task(id):
         cursor.close()
         return jsonify({'message': 'Tarefa excluída com sucesso'}), 200
     except Exception as e:
-        print(f"Erro ao deletar tarefa: {e}") # Para depuração
+        print(f"Erro ao deletar tarefa: {e}")
         return jsonify({'error': 'Erro interno no servidor'}), 500
     finally:
         if conn:
             conn.close()
 
 if __name__ == '__main__':
-    # A função init_db() será chamada apenas se você executar o app localmente.
-    # No Render, a inicialização do banco de dados (criação da tabela)
-    # pode ser feita via um "Build Command" ou um "Start Command" que execute init_db
-    # antes de iniciar o servidor Gunicorn.
     init_db()
     app.run(debug=True)
