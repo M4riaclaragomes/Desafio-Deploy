@@ -1,0 +1,16 @@
+    name: CD - Deploy Automatico
+
+    on:
+      push:
+        branches:
+          - main # Roda quando você envia código para a branch 'main'
+
+    jobs:
+      deploy:
+        runs-on: ubuntu-latest # Usa um computador virtual Linux para rodar
+        needs: build # IMPORTANTE: Só roda se o job de 'CI - Testes Automaticos' (do ci.yml) passar com sucesso
+
+        steps:
+        - name: Acionar Deploy no Render # Envia o comando para o Render fazer um novo deploy
+          run: curl "${{ secrets.RENDER_DEPLOY_HOOK }}" # Usa o link secreto que você guardou no GitHub
+    
